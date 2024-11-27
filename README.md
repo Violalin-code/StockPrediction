@@ -55,3 +55,18 @@ Explore the application of time-series analysis models like ARIMA or LSTM (Long 
 
 This project is a step toward leveraging machine learning techniques to analyze stock market data and make informed predictions. The combination of stock price and macroeconomic data will help build a more comprehensive model for predicting future movements in the stock market.
 
+## Contributions
+Viola Lin: Created the machine learning pipeline for stock price prediction, including model selection, data preprocessing, cross-validation, and hyperparameter tuning.
+ - Developed the code to handle stock price data and macroeconomic indicators.
+ - Implemented models such as Linear Regression, Random Forest, Decision Trees, SVR, XGBoost, KNN, and an ANN.
+ - Set up a preprocessing pipeline, including the extraction of date features, creation of lag features, and normalization of data.
+ - Evaluated and compared models using various metrics and conducted model optimization for better performance.
+Ethics and AI Considerations: Addressed the ethical considerations in the project, integrating a checklist in the Hugging Face app. Focused on transparency, fairness, and accountability in using machine learning for financial predictions. Developed a framework for assessing potential biases and risks associated with AI-driven stock price predictions.
+
+AI Model and Technical Guidance
+ChatGPT (OpenAI): Provided guidance on model selection, feature engineering, and ethical considerations related to the use of machine learning in financial predictions.
+
+Project Oversight and Academic Support
+Professor Okolie: Provided academic guidance and feedback throughout the project.
+
+GUI: https://huggingface.co/spaces/vjl004/StockMarketPrediction
