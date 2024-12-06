@@ -1,77 +1,186 @@
+import os
+import pickle
+import tensorflow as tf
+import numpy as np
 import pandas as pd
-from sklearn.preprocessing import StandardScaler
-import joblib 
+import gradio as gr
+from tensorflow.keras.models import model_from_json, Sequential, Model
 
-def predict_and_return_close(files, year, month, day, model, scaler):
+def load_stock_prediction_model(model_path="rnn_model.pkl", weights_path="rnn_model_weights.weights.h5"):
+    
+    # Check if model and weights files exist
+    if not os.path.exists(model_path):
+        raise FileNotFoundError(f"Could not find the model file at {model_path}. Please check the path and try again.")
+    
+    if not os.path.exists(weights_path):
+        raise FileNotFoundError(f"Could not find the weights file at {weights_path}. Please check the path and try again.")
+    
     try:
-        if not files:
-            return {"message": "Please upload at least one CSV file."}
+        # Load the model checkpoint
+        with open(model_path, "rb") as file:
+            checkpoint = pickle.load(file)
+        
+        # Verify required keys are present
+        required_keys = {"model", "weights_path", "scaler", "features"}
+        if not required_keys.issubset(checkpoint.keys()):
+            raise ValueError(
+                f"The pickle file does not contain all required keys: {required_keys}. Found: {checkpoint.keys()}"
+            )
+        
+        # Reconstruct the model from JSON architecture
+        model_architecture = checkpoint["model"]
+        better_model = tf.keras.models.model_from_json(model_architecture)
+        
+        # Load the saved weights
+        weights_path = checkpoint["weights_path"]
+        better_model.load_weights(weights_path)
+        
+        # Extract scaler and features
+        scaler = checkpoint["scaler"]
+        features = checkpoint["features"]
+        
+        return better_model, scaler, features
+    
+    except Exception as e:
+        raise RuntimeError(f"An error occurred during model loading: {e}")
 
-        # Initialize an empty DataFrame to store all combined data
-        all_data = pd.DataFrame()
+def preprocess_data(file, year, month, day, features, scaler):
+   
+    try:
+        # Read the CSV file
+        df = pd.read_csv(file)
+        
+        # Convert 'Date' column to datetime
+        df['Date'] = pd.to_datetime(df['Date'])
+        
+        # Check if the specific date exists in the CSV
+        input_date = pd.Timestamp(f"{year}-{month:02d}-{day:02d}")
+        existing_data = df[df['Date'] == input_date]
+        
+        # If date exists and has 'Adjusted Close', return that value
+        if not existing_data.empty and 'Adjusted Close' in existing_data.columns:
+            return f"Existing value: {existing_data['Adjusted Close'].values[0]:.2f}"
+        
+        # Prepare features for future prediction
+        df['day_of_week'] = df['Date'].dt.dayofweek
+        df['month'] = df['Date'].dt.month
+        df['year'] = df['Date'].dt.year
+        df['day_of_year'] = df['Date'].dt.dayofyear
 
-        # Required columns for prediction
-        required_columns = ['Adjusted Close', 'EBITDA', 'EV/EBITDA', 'Enterprise Value', 
-                            'Market Cap (USD)', 'Net Income TTM', 'Debt/Equity Ratio', 
-                            'PE Ratio', 'Revenue TTM', 'Shareholder Equity', 'Total Debt', 
-                            'Volume', 'High', 'Low']
+        # Create cyclic features
+        df['month_sin'] = np.sin(2 * np.pi * df['month'] / 12)
+        df['month_cos'] = np.cos(2 * np.pi * df['month'] / 12)
+        df['day_sin'] = np.sin(2 * np.pi * df['day_of_year'] / 365)
+        df['day_cos'] = np.cos(2 * np.pi * df['day_of_year'] / 365)
 
-        for file in files:
-            # Read each file
-            data = pd.read_csv(file.name)
+        # Add lag features
+        if 'Adjusted Close' in df.columns:
+            for lag in range(1, 4):
+                df[f'Lag_{lag}'] = df['Adjusted Close'].shift(lag)
+            df = df.dropna(subset=[f'Lag_{lag}' for lag in range(1, 4)])
+        else:
+            for lag in range(1, 4):
+                df[f'Lag_{lag}'] = 0
 
-            if 'Date' not in data.columns:
-                return {"message": f"File {file.name} must contain a 'Date' column."}
-
-            # Convert Date column to datetime
-            data['Date'] = pd.to_datetime(data['Date'], errors='coerce')
-
-            # Filter data for the specified date
-            data_filtered = data[(data['Date'].dt.year == year) & 
-                                  (data['Date'].dt.month == month) & 
-                                  (data['Date'].dt.day == day)]
-
-            # Keep only relevant columns (if they exist in the file)
-            columns_to_keep = ['Date'] + [col for col in required_columns if col in data.columns]
-            data_filtered = data_filtered[columns_to_keep]
-
-            # Append filtered data to all_data
-            all_data = pd.concat([all_data, data_filtered], ignore_index=True)
-
-        if all_data.empty:
-            return {"message": "No data found for the specified year, month, and day."}
-
-        # Deduplicate rows based on the 'Date' column (if there are overlaps between files)
-        all_data = all_data.drop_duplicates(subset=['Date'])
-
-        # Check if 'Adjusted Close' already exists and is valid
-        if not all_data['Adjusted Close'].isnull().all():
-            # Return only the Adjusted Close values for the app output
-            adjusted_close_data = all_data[['Adjusted Close']]
-            return {
-                "Adjusted Close": adjusted_close_data['Adjusted Close'].values.tolist()
-            }
-
-        # Ensure that there is enough data to make predictions
-        if all_data[required_columns].isnull().any().any():
-            return {"message": "Insufficient data to make predictions."}
-
-        # Scale the data and predict
-        scaled_features = scaler.transform(all_data[required_columns])
-        predictions = model.predict(scaled_features)
-
-        # Add predictions to the original DataFrame
-        all_data['Predicted Close'] = predictions
-
-        # Return the Date, Adjusted Close, and Predicted Close
-        return {
-            "message": "Prediction successful",
-            "Data": all_data[['Date', 'Adjusted Close', 'Predicted Close']].to_dict(orient="records")
-        }
+        # Select features
+        X = df[features]
+        
+        # Scale features if scaler is provided
+        if scaler:
+            X_scaled = scaler.transform(X)
+            return X_scaled
+        
+        return X
 
     except Exception as e:
-        return {"message": str(e)}
+        print(f"Preprocessing error: {e}")
+        return None
+
+def enhanced_prediction_diagnostic(file, year, month, day):
+   
+    try:
+        # Load model and preprocessing components
+        better_model, scaler, features = load_stock_prediction_model()
         
+        # Preprocess data
+        X_scaled = preprocess_data(file, year, month, day, features, scaler)
+        
+        # If preprocessing failed
+        if X_scaled is None:
+            print("Preprocessing failed")
+            return
+        
+        # Reshape for analysis
+        if X_scaled.ndim == 2:
+            X_scaled = X_scaled[-1:].reshape(1, 1, -1)
+        
+        # Print input features for diagnostic
+        print("\n--- Input Features ---")
+        feature_names = features
+        for i, feature_name in enumerate(feature_names):
+            print(f"{feature_name}: {X_scaled[0, 0, i]}")
+        
+        # Make prediction
+        predictions = better_model.predict(X_scaled)
+        prediction_value = float(predictions[0][0])
+        
+        # Historical data context
+        df = pd.read_csv(file)
+        df['Date'] = pd.to_datetime(df['Date'])
+        
+        # Last few historical values
+        last_values = df['Adjusted Close'].tail(5)
+        print("\n--- Last 5 Historical Adjusted Close Values ---")
+        print(last_values)
+        
+        # Trend analysis
+        trend = np.polyfit(range(len(last_values)), last_values, 1)
+        trend_slope = trend[0]
+        
+        print(f"\n--- Trend Analysis ---")
+        print(f"Recent Trend Slope: {trend_slope}")
+        print(f"Prediction: {prediction_value}")
+        
+        return prediction_value
+    
+    except Exception as e:
+        print(f"Diagnostic Error: {e}")
+        return None
+
+# Example usage
+result = enhanced_prediction_diagnostic('data.csv', 2024, 1, 15)
+
+def compile_preprocess_predict(file, year, month, day):
+
+    try:
+        # Load the model and preprocessing components
+        better_model, scaler, features = load_stock_prediction_model()
+        
+        # Preprocess the input data
+        X_scaled = preprocess_data(file, year, month, day, features, scaler)
+        
+        # Check if we got an existing value or need to predict
+        if isinstance(X_scaled, str):
+            return X_scaled
+        
+        # Check if preprocessing returned None
+        if X_scaled is None:
+            return "Error in data preprocessing"
+        
+        # Reshape for prediction
+        if X_scaled.ndim == 2:
+            # Take the last row and reshape
+            X_scaled = X_scaled[-1:].reshape(1, 1, -1)
+        
+        # Make prediction
+        predictions = better_model.predict(X_scaled)
+        prediction_value = float(predictions[0][0])
+        
+        return f"Predicted value: {prediction_value:.2f}"
+    
+    except Exception as e:
+        return f"Prediction error: {e}"
+
 datacard_content = """
 # Ethics DataCard for Stock Prediction Model
 ## Dataset Overview
@@ -191,21 +300,21 @@ Output Variables: Adjusted Close
 - What are the broader social and environmental implications if this model becomes widely adopted?
     - The broader social impact of the model will be positive, promoting transparency in financial markets and encouraging investments in sustainable and responsible companies. It may also contribute to global economic stability and sustainable market growth by aiding informed decision-making.
 """
-import gradio as gr
 
 # Gradio Interface
 with gr.Blocks() as interface:
     with gr.Tabs():
         with gr.Tab("Stock Prediction"):
-            file_input = gr.File(label="Upload CSV Files", file_types=[".csv"], file_count="multiple")
+            gr.Markdown("### Stock Prediction")
+            gr.Markdown("The uploaded CSV file must include financial factors with corresponding dates for any stock, such as basic stock information, P/E ratios, EV/EBITDA, Debt/Equity ratio, and TTM Free Cash Flow, ensuring all data is compiled with consistent dates for accurate analysis.")
+            file_input = gr.File(label="Upload CSV File", file_types=[".csv"], file_count="single")
             year_input = gr.Number(label="Year", value=2023)
             month_input = gr.Number(label="Month", value=1)
             day_input = gr.Number(label="Day", value=1)
             output = gr.Textbox(label="Results")
             submit_button = gr.Button("Submit")
 
-            # Ensure correct function reference
-            submit_button.click(predict_and_return_close, [file_input, year_input, month_input, day_input], output)
+            submit_button.click(compile_preprocess_predict, [file_input, year_input, month_input, day_input], output)
 
         with gr.Tab("Ethics Data Card"):
             gr.Markdown(datacard_content)
