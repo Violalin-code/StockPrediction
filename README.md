@@ -1,7 +1,14 @@
-# Stock Prediction
+# Stock Price Prediction Pipeline: Leveraging Multiple Machine Learning Models for Accurate and Efficient Forecasting 📈📉
 
 # Overview
 The project involved building a machine learning pipeline to predict stock prices, utilizing a range of models, including Linear Regression, Random Forest, Decision Trees, SVR, XGBoost, KNN, Artificial Neural Network (ANN), Recurrent Neural Networks (RNN), and Temporal Fusion Transformers (TFT). Given the time constraints, especially when dealing with large datasets and the complexity of model selection, the approach was adjusted to balance accuracy and efficiency.
+
+## Table of Contents
+- [Challenges and Approach](#project-structure)
+- [Ethics and AI Use](#technologies-used)
+- [Current Progress](#how-to-run-the-project)
+- [How to Run](#submission-details)
+- [Contributions](#deliverables)
 
 ## Challenges and Approach
 - Time Constraints in Model Development: Developing and tuning machine learning models within limited time led to a focus on exploring a variety of algorithms while still ensuring proper preprocessing and validation. The initial struggle was managing time effectively for feature engineering, such as extracting date features and creating lag features to capture temporal dependencies. Lag features were essential for understanding how past stock prices and macroeconomic indicators influence future movements. However, managing these within a tight timeline required prioritizing models that could handle the data efficiently without excessive computation time.
