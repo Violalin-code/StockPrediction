@@ -4,11 +4,20 @@
 The project involved building a machine learning pipeline to predict stock prices, utilizing a range of models, including Linear Regression, Random Forest, Decision Trees, SVR, XGBoost, KNN, Artificial Neural Network (ANN), Recurrent Neural Networks (RNN), and Temporal Fusion Transformers (TFT). Given the time constraints, especially when dealing with large datasets and the complexity of model selection, the approach was adjusted to balance accuracy and efficiency.
 
 ## Table of Contents
-- [Challenges and Approach](#project-structure)
-- [Ethics and AI Use](#technologies-used)
-- [Current Progress](#how-to-run-the-project)
-- [How to Run](#submission-details)
-- [Contributions](#deliverables)
+- [How to Run the Project](#How-to-Run)
+- [Challenges and Approach](#Challenges-and-Approach)
+- [Ethics and AI Use](#Ethics-and-AI-Use)
+- [Current Progress](#Current-Progress)
+- [Contributions](#Contributions)
+
+## How to Run
+- Install Required Libraries: Ensure that the necessary libraries are installed. The code will automatically install scikit-learn if missing.
+- Prepare the Model Files: Place the following files in the same directory as the code:
+- best_model.pkl (pre-trained model)
+- label_encoder.pkl (label encoder for decoding predictions)
+- Run the Code: Execute the script to launch the app.
+
+GUI: https://huggingface.co/spaces/vjl004/StockMarketPrediction
 
 ## Challenges and Approach
 - Time Constraints in Model Development: Developing and tuning machine learning models within limited time led to a focus on exploring a variety of algorithms while still ensuring proper preprocessing and validation. The initial struggle was managing time effectively for feature engineering, such as extracting date features and creating lag features to capture temporal dependencies. Lag features were essential for understanding how past stock prices and macroeconomic indicators influence future movements. However, managing these within a tight timeline required prioritizing models that could handle the data efficiently without excessive computation time.
@@ -61,5 +70,3 @@ AI Model and Technical Guidance
 
 Project Oversight and Academic Support
 - Professor Okolie: Provided academic guidance and feedback throughout the project.
-
-GUI: https://huggingface.co/spaces/vjl004/StockMarketPrediction
